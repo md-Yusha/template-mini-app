@@ -59,6 +59,18 @@ export interface Project {
   updatedAt: number;
 }
 
+export interface MediaItem {
+  id: string;
+  type: "video" | "audio" | "image" | "text";
+  source: string;
+  name: string;
+  thumbnail?: string;
+  duration?: number;
+  size?: number;
+  createdAt: number;
+  tags?: string[];
+}
+
 interface VibeForgeState {
   // Project State
   currentProject: Project | null;
@@ -74,6 +86,10 @@ interface VibeForgeState {
   aiGenerations: AIGeneration[];
   aiPrompt: string;
   isGenerating: boolean;
+
+  // Media Library State
+  mediaLibrary: MediaItem[];
+  selectedMedia: string | null;
 
   // UI State
   activePanel: "timeline" | "ai" | "export" | "settings";
@@ -106,12 +122,19 @@ interface VibeForgeState {
     toTrackId: string,
     newPosition: number
   ) => void;
+  copyClip: (clipId: string) => void;
+  pasteClip: (trackId: string, position: number) => void;
 
   // AI Actions
   addAIGeneration: (generation: AIGeneration) => void;
   updateAIGeneration: (id: string, updates: Partial<AIGeneration>) => void;
   setAIPrompt: (prompt: string) => void;
   setIsGenerating: (generating: boolean) => void;
+
+  // Media Library Actions
+  addMediaItem: (item: MediaItem) => void;
+  removeMediaItem: (itemId: string) => void;
+  setSelectedMedia: (itemId: string | null) => void;
 
   // UI Actions
   setActivePanel: (panel: "timeline" | "ai" | "export" | "settings") => void;
@@ -172,6 +195,8 @@ export const useVibeForgeStore = create<VibeForgeState>()(
       aiGenerations: [],
       aiPrompt: "",
       isGenerating: false,
+      mediaLibrary: [],
+      selectedMedia: null,
       activePanel: "timeline",
       sidebarOpen: true,
 
@@ -249,6 +274,35 @@ export const useVibeForgeStore = create<VibeForgeState>()(
             },
           };
         }),
+
+      // AI Actions
+      addAIGeneration: (generation) =>
+        set((state) => ({
+          aiGenerations: [generation, ...state.aiGenerations],
+        })),
+
+      updateAIGeneration: (id, updates) =>
+        set((state) => ({
+          aiGenerations: state.aiGenerations.map((g) =>
+            g.id === id ? { ...g, ...updates } : g
+          ),
+        })),
+
+      setAIPrompt: (prompt) => set({ aiPrompt: prompt }),
+      setIsGenerating: (generating) => set({ isGenerating: generating }),
+
+      // Media Library Actions
+      addMediaItem: (item) =>
+        set((state) => ({
+          mediaLibrary: [item, ...state.mediaLibrary],
+        })),
+
+      removeMediaItem: (itemId) =>
+        set((state) => ({
+          mediaLibrary: state.mediaLibrary.filter((item) => item.id !== itemId),
+        })),
+
+      setSelectedMedia: (itemId) => set({ selectedMedia: itemId }),
 
       // Clip Actions
       addClip: (trackId, clip) =>
@@ -336,21 +390,40 @@ export const useVibeForgeStore = create<VibeForgeState>()(
           };
         }),
 
-      // AI Actions
-      addAIGeneration: (generation) =>
-        set((state) => ({
-          aiGenerations: [generation, ...state.aiGenerations],
-        })),
+      copyClip: (clipId) => {
+        const state = get();
+        if (!state.currentProject) return;
 
-      updateAIGeneration: (id, updates) =>
-        set((state) => ({
-          aiGenerations: state.aiGenerations.map((g) =>
-            g.id === id ? { ...g, ...updates } : g
-          ),
-        })),
+        const clip = state.currentProject.tracks
+          .flatMap((t) => t.clips)
+          .find((c) => c.id === clipId);
 
-      setAIPrompt: (prompt) => set({ aiPrompt: prompt }),
-      setIsGenerating: (generating) => set({ isGenerating: generating }),
+        if (clip) {
+          // Store in localStorage for clipboard functionality
+          localStorage.setItem("vibeforge-clipboard", JSON.stringify(clip));
+        }
+      },
+
+      pasteClip: (trackId, position) => {
+        const state = get();
+        if (!state.currentProject) return;
+
+        const clipboardData = localStorage.getItem("vibeforge-clipboard");
+        if (!clipboardData) return;
+
+        try {
+          const originalClip = JSON.parse(clipboardData);
+          const newClip = {
+            ...originalClip,
+            id: `clip-${Date.now()}`,
+            position: position,
+          };
+
+          state.addClip(trackId, newClip);
+        } catch (error) {
+          console.error("Failed to paste clip:", error);
+        }
+      },
 
       // UI Actions
       setActivePanel: (panel) => set({ activePanel: panel }),

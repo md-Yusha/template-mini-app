@@ -12,6 +12,8 @@ import {
   Loader2,
   Download,
   Settings,
+  CheckCircle,
+  AlertCircle,
 } from "lucide-react";
 import { useVibeForgeStore } from "~/lib/store";
 import { generateAIContent, HUGGING_FACE_MODELS } from "~/lib/ai";
@@ -32,11 +34,16 @@ export function AIPanel() {
     addAIGeneration,
     updateAIGeneration,
     aiGenerations,
+    addMediaItem,
   } = useVibeForgeStore();
   const [selectedTool, setSelectedTool] = useState<AITool>("text-to-image");
   const [selectedModel, setSelectedModel] = useState<string>("Qwen/Qwen-Image");
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<
+    "idle" | "generating" | "success" | "error"
+  >("idle");
+  const [statusMessage, setStatusMessage] = useState("");
 
   const aiTools = [
     {
@@ -75,6 +82,9 @@ export function AIPanel() {
     if (!aiPrompt.trim()) return;
 
     setIsGenerating(true);
+    setGenerationStatus("generating");
+    setStatusMessage("Initializing AI generation...");
+
     const generationId = `gen-${Date.now()}`;
 
     // Add generation to store
@@ -87,6 +97,8 @@ export function AIPanel() {
     });
 
     try {
+      setStatusMessage("Processing your request...");
+
       const result = await generateAIContent({
         type: selectedTool,
         prompt: aiPrompt,
@@ -97,23 +109,58 @@ export function AIPanel() {
 
       if (result.success && result.data) {
         setGeneratedContent(result.data);
+        setGenerationStatus("success");
+        setStatusMessage("Generation completed successfully!");
+
         updateAIGeneration(generationId, {
           status: "completed",
           result: result.data,
         });
+
+        // Automatically add to media library
+        const mediaItem = {
+          id: `ai-media-${Date.now()}`,
+          type: (selectedTool.includes("image")
+            ? "image"
+            : selectedTool.includes("video")
+            ? "video"
+            : "text") as "video" | "audio" | "image" | "text",
+          source: result.data,
+          name: `AI Generated ${selectedTool.replace("-", " ")}`,
+          thumbnail: selectedTool.includes("image") ? result.data : undefined,
+          duration: selectedTool.includes("video") ? 10 : undefined,
+          createdAt: Date.now(),
+          tags: ["ai-generated", selectedTool],
+        };
+
+        addMediaItem(mediaItem);
+        setStatusMessage("Added to media library!");
       } else {
+        setGenerationStatus("error");
+        setStatusMessage(result.error || "Generation failed");
+
         updateAIGeneration(generationId, {
           status: "error",
           error: result.error || "Generation failed",
         });
       }
     } catch (error) {
+      setGenerationStatus("error");
+      setStatusMessage(
+        error instanceof Error ? error.message : "Unknown error"
+      );
+
       updateAIGeneration(generationId, {
         status: "error",
         error: error instanceof Error ? error.message : "Unknown error",
       });
     } finally {
       setIsGenerating(false);
+      // Reset status after a delay
+      setTimeout(() => {
+        setGenerationStatus("idle");
+        setStatusMessage("");
+      }, 3000);
     }
   };
 
@@ -167,19 +214,19 @@ export function AIPanel() {
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col p-4">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-5 h-5 text-neon-cyan" />
-        <h2 className="text-neon-cyan text-xl font-bold">AI Assistant</h2>
+        <h2 className="text-neon-cyan text-lg font-bold">AI Assistant</h2>
       </div>
 
-      {/* AI Tools Selection */}
+      {/* AI Tools Selection - Mobile optimized */}
       <div className="mb-4">
-        <div className="text-sm font-medium text-foreground mb-2">
+        <div className="text-sm font-medium text-foreground mb-3">
           Choose AI Tool:
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-3">
           {aiTools.map((tool) => (
             <button
               key={tool.id}
@@ -188,14 +235,14 @@ export function AIPanel() {
                 setSelectedModel(Object.keys(tool.models)[0] || "");
               }}
               className={cn(
-                "p-3 rounded-lg border transition-all duration-200 text-left",
+                "p-4 rounded-lg border transition-all duration-200 text-left",
                 selectedTool === tool.id
                   ? "border-neon-cyan bg-neon-cyan/10 text-neon-cyan"
                   : "border-border hover:border-neon-cyan/50"
               )}
             >
-              <div className="flex items-center gap-2 mb-1">
-                <tool.icon className="w-4 h-4" />
+              <div className="flex items-center gap-2 mb-2">
+                <tool.icon className="w-5 h-5" />
                 <span className="text-sm font-medium">{tool.label}</span>
               </div>
               <div className="text-xs text-muted-foreground">
@@ -215,7 +262,7 @@ export function AIPanel() {
           <select
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
-            className="w-full p-2 bg-secondary border border-border rounded-lg text-foreground focus:border-neon-cyan focus:outline-none text-sm"
+            className="w-full p-3 bg-secondary border border-border rounded-lg text-foreground focus:border-neon-cyan focus:outline-none text-sm"
           >
             {Object.keys(currentTool.models).map((modelName) => (
               <option key={modelName} value={modelName}>
@@ -264,28 +311,53 @@ export function AIPanel() {
           value={aiPrompt}
           onChange={(e) => setAIPrompt(e.target.value)}
           placeholder="Enter your prompt here..."
-          className="w-full h-20 p-3 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground resize-none focus:border-neon-cyan focus:outline-none"
+          className="w-full h-24 p-3 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground resize-none focus:border-neon-cyan focus:outline-none"
           disabled={isGenerating}
         />
       </div>
+
+      {/* Status Message */}
+      {statusMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={cn(
+            "mb-4 p-3 rounded-lg flex items-center gap-2 text-sm",
+            generationStatus === "success"
+              ? "bg-neon-green/10 text-neon-green border border-neon-green/20"
+              : generationStatus === "error"
+              ? "bg-destructive/10 text-destructive border border-destructive/20"
+              : "bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20"
+          )}
+        >
+          {generationStatus === "success" ? (
+            <CheckCircle className="w-4 h-4" />
+          ) : generationStatus === "error" ? (
+            <AlertCircle className="w-4 h-4" />
+          ) : (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          )}
+          {statusMessage}
+        </motion.div>
+      )}
 
       {/* Generate Button */}
       <button
         onClick={handleGenerate}
         disabled={isGenerating || !aiPrompt.trim()}
         className={cn(
-          "cyberpunk-btn w-full py-3 rounded-lg mb-4 flex items-center justify-center gap-2",
+          "cyberpunk-btn w-full py-4 rounded-lg mb-4 flex items-center justify-center gap-2 text-base",
           isGenerating ? "opacity-50 cursor-not-allowed" : ""
         )}
       >
         {isGenerating ? (
           <>
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-5 h-5 animate-spin" />
             Generating...
           </>
         ) : (
           <>
-            <Sparkles className="w-4 h-4" />
+            <Sparkles className="w-5 h-5" />
             Generate
           </>
         )}
@@ -327,7 +399,7 @@ export function AIPanel() {
           <div className="flex gap-2">
             <button
               onClick={handleAddToTimeline}
-              className="cyberpunk-btn flex-1 py-2 rounded-lg flex items-center justify-center gap-2"
+              className="cyberpunk-btn flex-1 py-3 rounded-lg flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Add to Timeline
@@ -335,7 +407,7 @@ export function AIPanel() {
 
             <button
               onClick={handleDownload}
-              className="cyberpunk-btn px-3 py-2 rounded-lg"
+              className="cyberpunk-btn px-4 py-3 rounded-lg"
             >
               <Download className="w-4 h-4" />
             </button>

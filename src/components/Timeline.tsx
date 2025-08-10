@@ -1,17 +1,13 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
 import {
   Play,
   Pause,
   SkipBack,
   SkipForward,
-  Volume2,
-  VolumeX,
   Plus,
   Trash2,
-  Scissors,
   Copy,
 } from "lucide-react";
 import { useVibeForgeStore } from "~/lib/store";
@@ -27,13 +23,17 @@ export function Timeline() {
     selectedClip,
     setSelectedClip,
     addTrack,
-    removeTrack,
     addClip,
     removeClip,
+    copyClip,
+    pasteClip,
+    moveClip,
+    mediaLibrary,
   } = useVibeForgeStore();
 
-  const [zoom, setZoom] = useState(1);
-  const [showWaveform, setShowWaveform] = useState(true);
+  const [zoom] = useState(1);
+  const [draggedClip, setDraggedClip] = useState<string | null>(null);
+  const [dragOverTrack, setDragOverTrack] = useState<string | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -97,10 +97,6 @@ export function Timeline() {
     addTrack(newTrack);
   };
 
-  const handleRemoveTrack = (trackId: string) => {
-    removeTrack(trackId);
-  };
-
   const handleAddClip = (trackId: string) => {
     const newClip = {
       id: `clip-${Date.now()}`,
@@ -122,6 +118,75 @@ export function Timeline() {
     }
   };
 
+  const handleCopyClip = (clipId: string) => {
+    copyClip(clipId);
+  };
+
+  const handlePasteClip = (trackId: string) => {
+    const rect = timelineRef.current?.getBoundingClientRect();
+    if (rect) {
+      const pastePosition = currentTime;
+      pasteClip(trackId, pastePosition);
+    }
+  };
+
+  const handleClipDragStart = (e: React.DragEvent, clipId: string) => {
+    setDraggedClip(clipId);
+    e.dataTransfer.setData("text/plain", clipId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleClipDragEnd = () => {
+    setDraggedClip(null);
+    setDragOverTrack(null);
+  };
+
+  const handleTrackDragOver = (e: React.DragEvent, trackId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverTrack(trackId);
+  };
+
+  const handleTrackDrop = (e: React.DragEvent, trackId: string) => {
+    e.preventDefault();
+    const clipId = e.dataTransfer.getData("text/plain");
+
+    // Check if it's a media item from the media library
+    const mediaItem = mediaLibrary.find((item) => item.id === clipId);
+    if (mediaItem) {
+      const newClip = {
+        id: `clip-${Date.now()}`,
+        type: mediaItem.type,
+        source: mediaItem.source,
+        startTime: 0,
+        duration: mediaItem.duration || 5,
+        track: tracks.findIndex((t) => t.id === trackId),
+        position: currentTime,
+        volume: 1,
+      };
+      addClip(trackId, newClip);
+    } else {
+      // It's an existing clip being moved
+      const rect = timelineRef.current?.getBoundingClientRect();
+      if (rect) {
+        const dropX = e.clientX - rect.left;
+        const newPosition =
+          (dropX / rect.width) * (currentProject?.duration || 60);
+
+        // Find the source track
+        const sourceTrack = tracks.find((t) =>
+          t.clips.some((c) => c.id === clipId)
+        );
+
+        if (sourceTrack && sourceTrack.id !== trackId) {
+          moveClip(clipId, sourceTrack.id, trackId, newPosition);
+        }
+      }
+    }
+
+    setDragOverTrack(null);
+  };
+
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -133,7 +198,7 @@ export function Timeline() {
   const getTimeMarkers = () => {
     const duration = currentProject?.duration || 60;
     const markers = [];
-    const interval = Math.max(1, Math.floor(duration / 20));
+    const interval = Math.max(1, Math.floor(duration / 10)); // Fewer markers for mobile
 
     for (let i = 0; i <= duration; i += interval) {
       markers.push(i);
@@ -160,14 +225,14 @@ export function Timeline() {
   const currentPlayingClip = getCurrentPlayingClip();
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Timeline Header */}
+    <div className="h-full flex flex-col p-4">
+      {/* Timeline Header - Mobile optimized */}
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
-          <h2 className="text-neon-cyan text-xl font-bold">Timeline</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-neon-cyan text-lg font-bold">Timeline</h2>
 
-          {/* Playback Controls */}
-          <div className="flex items-center gap-2">
+          {/* Mobile Playback Controls */}
+          <div className="flex items-center gap-1">
             <button
               onClick={() => setIsPlaying(!isPlaying)}
               className="cyberpunk-btn p-2 rounded-lg"
@@ -197,51 +262,13 @@ export function Timeline() {
               <SkipForward className="w-4 h-4" />
             </button>
           </div>
-
-          {/* Current Time Display */}
-          <div className="text-sm text-muted-foreground">
-            {formatTime(currentTime)} /{" "}
-            {formatTime(currentProject?.duration || 60)}
-          </div>
-
-          {/* Current Playing Clip Info */}
-          {currentPlayingClip && (
-            <div className="text-xs text-neon-green">
-              Playing: {currentPlayingClip.clip.type} on{" "}
-              {currentPlayingClip.track.name}
-            </div>
-          )}
         </div>
 
         {/* Timeline Controls */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Zoom:</span>
-            <input
-              type="range"
-              min="0.1"
-              max="3"
-              step="0.1"
-              value={zoom}
-              onChange={(e) => setZoom(parseFloat(e.target.value))}
-              className="w-20 h-1 bg-secondary rounded-lg appearance-none cursor-pointer slider"
-            />
-          </div>
-
-          <button
-            onClick={() => setShowWaveform(!showWaveform)}
-            className="cyberpunk-btn px-3 py-1 rounded-lg text-sm"
-          >
-            {showWaveform ? (
-              <Volume2 className="w-4 h-4" />
-            ) : (
-              <VolumeX className="w-4 h-4" />
-            )}
-          </button>
-
+        <div className="flex items-center gap-2">
           <button
             onClick={handleAddTrack}
-            className="cyberpunk-btn px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+            className="cyberpunk-btn px-3 py-2 rounded-lg text-sm flex items-center gap-1"
           >
             <Plus className="w-4 h-4" />
             Add Track
@@ -249,14 +276,19 @@ export function Timeline() {
         </div>
       </div>
 
-      {/* Timeline Ruler */}
-      <div className="h-8 bg-secondary rounded-lg mb-2 relative overflow-hidden">
+      {/* Current Time Display */}
+      <div className="text-sm text-muted-foreground mb-3">
+        {formatTime(currentTime)} / {formatTime(currentProject?.duration || 60)}
+      </div>
+
+      {/* Timeline Ruler - Mobile optimized */}
+      <div className="h-10 bg-secondary rounded-lg mb-3 relative overflow-hidden">
         <div className="flex h-full">
           {getTimeMarkers().map((time) => (
             <div
               key={time}
               className="flex-1 border-r border-border relative"
-              style={{ minWidth: `${zoom * 50}px` }}
+              style={{ minWidth: `${zoom * 40}px` }}
             >
               <div className="absolute top-1 left-1 text-xs text-muted-foreground">
                 {formatTime(time)}
@@ -274,7 +306,7 @@ export function Timeline() {
         />
       </div>
 
-      {/* Timeline Tracks */}
+      {/* Timeline Tracks - Mobile optimized */}
       <div className="flex-1 overflow-y-auto">
         <div
           ref={timelineRef}
@@ -285,18 +317,22 @@ export function Timeline() {
             <div
               key={track.id}
               className={cn(
-                "timeline-track h-16 mb-2 rounded-lg relative",
+                "timeline-track h-16 mb-2 rounded-lg relative transition-all",
                 selectedClip && track.clips.some((c) => c.id === selectedClip)
                   ? "ring-2 ring-neon-cyan"
+                  : dragOverTrack === track.id
+                  ? "ring-2 ring-neon-green bg-neon-green/10"
                   : ""
               )}
+              onDragOver={(e) => handleTrackDragOver(e, track.id)}
+              onDrop={(e) => handleTrackDrop(e, track.id)}
             >
-              {/* Track Header */}
-              <div className="absolute left-0 top-0 w-32 h-full bg-secondary border-r border-border rounded-l-lg flex items-center justify-between px-3">
-                <div className="flex items-center gap-2">
+              {/* Track Header - Simplified for mobile */}
+              <div className="absolute left-0 top-0 w-24 h-full bg-secondary border-r border-border rounded-l-lg flex items-center justify-between px-2">
+                <div className="flex items-center gap-1">
                   <div
                     className={cn(
-                      "w-3 h-3 rounded-full",
+                      "w-2 h-2 rounded-full",
                       track.type === "video"
                         ? "bg-neon-cyan"
                         : track.type === "audio"
@@ -304,7 +340,7 @@ export function Timeline() {
                         : "bg-neon-magenta"
                     )}
                   />
-                  <span className="text-sm font-medium truncate">
+                  <span className="text-xs font-medium truncate">
                     {track.name}
                   </span>
                 </div>
@@ -317,16 +353,17 @@ export function Timeline() {
                     <Plus className="w-3 h-3" />
                   </button>
                   <button
-                    onClick={() => handleRemoveTrack(track.id)}
-                    className="p-1 hover:bg-destructive/20 rounded text-destructive"
+                    onClick={() => handlePasteClip(track.id)}
+                    className="p-1 hover:bg-primary/20 rounded"
+                    title="Paste clip"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Copy className="w-3 h-3" />
                   </button>
                 </div>
               </div>
 
               {/* Track Content */}
-              <div className="ml-32 h-full relative">
+              <div className="ml-24 h-full relative">
                 {/* Clips */}
                 {track.clips.map((clip) => {
                   const isPlaying = currentPlayingClip?.clip.id === clip.id;
@@ -335,10 +372,8 @@ export function Timeline() {
                     currentTime < clip.position + clip.duration;
 
                   return (
-                    <motion.div
+                    <div
                       key={clip.id}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
                       className={cn(
                         "absolute top-1 bottom-1 rounded border-2 cursor-pointer transition-all",
                         selectedClip === clip.id
@@ -347,6 +382,8 @@ export function Timeline() {
                           ? "border-neon-green bg-neon-green/20"
                           : isInPlayhead
                           ? "border-neon-yellow bg-neon-yellow/20"
+                          : draggedClip === clip.id
+                          ? "border-neon-magenta bg-neon-magenta/20 opacity-50"
                           : "border-border bg-secondary hover:border-neon-cyan/50"
                       )}
                       style={{
@@ -359,7 +396,12 @@ export function Timeline() {
                           100
                         }%`,
                       }}
-                      onClick={(e: React.MouseEvent) => {
+                      draggable
+                      onDragStart={(e: React.DragEvent) =>
+                        handleClipDragStart(e, clip.id)
+                      }
+                      onDragEnd={handleClipDragEnd}
+                      onClick={(e) => {
                         e.stopPropagation();
                         setSelectedClip(clip.id);
                       }}
@@ -370,6 +412,8 @@ export function Timeline() {
                             ? "🎬"
                             : clip.type === "audio"
                             ? "🎵"
+                            : clip.type === "image"
+                            ? "🖼️"
                             : "📝"}{" "}
                           {clip.id}
                           {isPlaying && " ▶️"}
@@ -380,18 +424,10 @@ export function Timeline() {
                             <button
                               onClick={(e: React.MouseEvent) => {
                                 e.stopPropagation();
-                                // Split clip logic
+                                handleCopyClip(clip.id);
                               }}
                               className="p-1 hover:bg-primary/20 rounded"
-                            >
-                              <Scissors className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={(e: React.MouseEvent) => {
-                                e.stopPropagation();
-                                // Copy clip logic
-                              }}
-                              className="p-1 hover:bg-primary/20 rounded"
+                              title="Copy clip"
                             >
                               <Copy className="w-3 h-3" />
                             </button>
@@ -401,33 +437,16 @@ export function Timeline() {
                                 handleRemoveClip(track.id, clip.id);
                               }}
                               className="p-1 hover:bg-destructive/20 rounded text-destructive"
+                              title="Delete clip"
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
                           </div>
                         )}
                       </div>
-                    </motion.div>
+                    </div>
                   );
                 })}
-
-                {/* Waveform (placeholder) */}
-                {showWaveform && track.type === "audio" && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-full h-8 flex items-end justify-center gap-px">
-                      {Array.from({ length: 50 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="bg-neon-green/30 rounded-sm"
-                          style={{
-                            height: `${Math.random() * 100}%`,
-                            width: "2px",
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           ))}

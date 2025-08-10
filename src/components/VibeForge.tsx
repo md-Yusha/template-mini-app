@@ -7,24 +7,20 @@ import {
   SkipBack,
   SkipForward,
   Settings,
-  Download,
-  Share,
-  Plus,
-  Type,
-  Image,
   Video,
-  Music,
+  Folder,
+  Upload,
+  Sparkles,
 } from "lucide-react";
 import { useVibeForgeStore } from "~/lib/store";
 import { VideoPlayer } from "./VideoPlayer";
 import { FileUpload } from "./FileUpload";
 import { Timeline } from "./Timeline";
 import { AIPanel } from "./AIPanel";
-import { VideoEffects } from "./VideoEffects";
-import { TextOverlay } from "./TextOverlay";
+import { MediaArea } from "./MediaArea";
 import { cn } from "~/lib/utils";
 
-type TabType = "upload" | "timeline" | "ai" | "effects" | "text" | "audio";
+type TabType = "upload" | "media" | "ai" | "timeline";
 
 export function VibeForge() {
   const {
@@ -36,7 +32,7 @@ export function VibeForge() {
     createNewProject,
   } = useVibeForgeStore();
 
-  const [activeTab, setActiveTab] = useState<TabType>("upload");
+  const [activeTab, setActiveTab] = useState<TabType>("media");
 
   // Create a new project on mount if none exists
   useEffect(() => {
@@ -67,151 +63,114 @@ export function VibeForge() {
   };
 
   const tabs = [
-    { id: "upload", label: "Upload", icon: Plus },
-    { id: "timeline", label: "Timeline", icon: Video },
-    { id: "ai", label: "AI Tools", icon: Image },
-    { id: "effects", label: "Effects", icon: Settings },
-    { id: "text", label: "Text", icon: Type },
-    { id: "audio", label: "Audio", icon: Music },
+    { id: "upload", label: "Upload", icon: Upload },
+    { id: "media", label: "Media", icon: Folder },
+    { id: "ai", label: "AI", icon: Sparkles },
+    { id: "timeline", label: "Timeline", icon: Settings },
   ];
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "upload":
+        return <FileUpload />;
+      case "media":
+        return <MediaArea />;
+      case "ai":
+        return <AIPanel />;
+      case "timeline":
+        return <Timeline />;
+      default:
+        return <MediaArea />;
+    }
+  };
 
   return (
     <div className="h-screen bg-background text-foreground flex flex-col">
-      {/* Header */}
-      <header className="glass-panel border-b border-border p-4">
+      {/* Mobile Header */}
+      <header className="bg-card border-b border-border p-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-neon-cyan">VibeForge</h1>
-            <span className="text-sm text-muted-foreground">
-              AI-powered onchain video editor
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-neon-cyan">VibeForge</h1>
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              AI video editor
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Project Info */}
-            <div className="text-sm">
-              <div className="font-medium">
-                {currentProject?.name || "Untitled Project"}
-              </div>
-              <div className="text-muted-foreground">
-                {currentProject?.tracks.length || 0} tracks
-              </div>
-            </div>
+          {/* Mobile Playback Controls */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handlePlayPause}
+              className="cyberpunk-btn p-2 rounded-lg"
+            >
+              {isPlaying ? (
+                <Pause className="w-4 h-4" />
+              ) : (
+                <Play className="w-4 h-4" />
+              )}
+            </button>
 
-            {/* Playback Controls */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePlayPause}
-                className="cyberpunk-btn p-2 rounded-lg"
-              >
-                {isPlaying ? (
-                  <Pause className="w-4 h-4" />
-                ) : (
-                  <Play className="w-4 h-4" />
-                )}
-              </button>
+            <button
+              onClick={handleSkipBack}
+              className="cyberpunk-btn p-2 rounded-lg"
+            >
+              <SkipBack className="w-4 h-4" />
+            </button>
 
-              <button
-                onClick={handleSkipBack}
-                className="cyberpunk-btn p-2 rounded-lg"
-              >
-                <SkipBack className="w-4 h-4" />
-              </button>
+            <button
+              onClick={handleSkipForward}
+              className="cyberpunk-btn p-2 rounded-lg"
+            >
+              <SkipForward className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
-              <button
-                onClick={handleSkipForward}
-                className="cyberpunk-btn p-2 rounded-lg"
-              >
-                <SkipForward className="w-4 h-4" />
-              </button>
-
-              <div className="text-sm text-muted-foreground ml-2">
-                {formatTime(currentTime)} /{" "}
-                {formatTime(currentProject?.duration || 60)}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2">
-              <button className="cyberpunk-btn px-3 py-2 rounded-lg text-sm">
-                <Download className="w-4 h-4 mr-1" />
-                Export
-              </button>
-              <button className="cyberpunk-btn px-3 py-2 rounded-lg text-sm">
-                <Share className="w-4 h-4 mr-1" />
-                Share
-              </button>
-            </div>
+        {/* Time Display */}
+        <div className="flex items-center justify-between mt-2">
+          <div className="text-sm text-muted-foreground">
+            {formatTime(currentTime)} /{" "}
+            {formatTime(currentProject?.duration || 60)}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {currentProject?.tracks.length || 0} tracks
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="flex-1 flex">
-        {/* Left Panel - Video Preview */}
-        <div className="flex-1 p-4">
-          <div className="h-full glass-panel rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-4">
-              <Video className="w-5 h-5 text-neon-cyan" />
-              <h2 className="text-neon-cyan text-xl font-bold">
-                Canvas Preview
-              </h2>
-            </div>
-            <VideoPlayer />
-          </div>
+      {/* Pinned Video Preview */}
+      <div className="h-48 bg-card border-b border-border p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Video className="w-4 h-4 text-neon-cyan" />
+          <h2 className="text-neon-cyan text-sm font-bold">Preview</h2>
         </div>
+        <div className="h-full">
+          <VideoPlayer />
+        </div>
+      </div>
 
-        {/* Right Panel - Tools */}
-        <div className="lg:w-96 glass-panel rounded-xl p-4">
-          <div className="h-full flex flex-col">
-            {/* Tab Navigation */}
-            <div className="flex items-center gap-2 mb-4 overflow-x-auto">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as TabType)}
-                  className={cn(
-                    "flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
-                    activeTab === tab.id
-                      ? "bg-neon-cyan text-background"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                  )}
-                >
-                  <tab.icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-hidden">{renderTabContent()}</div>
 
-            {/* Tab Content */}
-            <div className="flex-1 overflow-y-auto">
-              {activeTab === "upload" && <FileUpload />}
-              {activeTab === "timeline" && <Timeline />}
-              {activeTab === "ai" && <AIPanel />}
-              {activeTab === "effects" && <VideoEffects />}
-              {activeTab === "text" && <TextOverlay />}
-              {activeTab === "audio" && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Music className="w-5 h-5 text-neon-cyan" />
-                    <h3 className="text-neon-cyan text-lg font-bold">
-                      Audio Tools
-                    </h3>
-                  </div>
-                  <div className="text-muted-foreground">
-                    Audio editing features coming soon...
-                  </div>
-                </div>
+      {/* Mobile Bottom Navigation */}
+      <nav className="bg-card border-t border-border p-2">
+        <div className="flex items-center justify-around">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as TabType)}
+              className={cn(
+                "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors min-w-0 flex-1",
+                activeTab === tab.id
+                  ? "bg-neon-cyan text-background"
+                  : "text-muted-foreground hover:text-foreground"
               )}
-            </div>
-          </div>
+            >
+              <tab.icon className="w-5 h-5" />
+              <span className="text-xs font-medium truncate">{tab.label}</span>
+            </button>
+          ))}
         </div>
-      </div>
-
-      {/* Bottom Panel - Timeline */}
-      <div className="h-64 glass-panel border-t border-border p-4">
-        <Timeline />
-      </div>
+      </nav>
     </div>
   );
 }
