@@ -30,7 +30,6 @@ export function MediaArea() {
     setSelectedMedia,
     removeMediaItem,
     addMediaItem,
-    currentTime,
     addClip,
   } = useVibeForgeStore();
 
@@ -61,8 +60,8 @@ export function MediaArea() {
   };
 
   const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      acceptedFiles.forEach((file) => {
+    async (acceptedFiles: File[]) => {
+      for (const file of acceptedFiles) {
         const extension = file.name.split(".").pop()?.toLowerCase() || "";
         let type: "video" | "audio" | "image" = "video";
 
@@ -75,22 +74,97 @@ export function MediaArea() {
         }
 
         const fileId = `media-${Date.now()}-${Math.random()}`;
-        const preview = URL.createObjectURL(file);
 
-        const mediaItem = {
-          id: fileId,
-          type: type,
-          source: preview,
-          name: file.name,
-          thumbnail: type === "image" ? preview : undefined,
-          duration: type === "video" ? 10 : undefined,
-          size: file.size,
-          createdAt: Date.now(),
-          tags: ["uploaded"],
-        };
+        try {
+          // Upload file to server
+          const formData = new FormData();
+          formData.append("file", file);
 
-        addMediaItem(mediaItem);
-      });
+          const response = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error("Upload failed");
+          }
+
+          const result = await response.json();
+          const serverUrl = result.url; // This is the URL from the server
+
+          // For video files, we need to get the actual duration
+          if (type === "video") {
+            const video = document.createElement("video");
+            video.preload = "metadata";
+            video.onloadedmetadata = () => {
+              const mediaItem = {
+                id: fileId,
+                type: type,
+                source: serverUrl, // Use server URL instead of blob URL
+                name: file.name,
+                thumbnail: undefined,
+                duration: video.duration, // Use actual video duration
+                size: file.size,
+                createdAt: Date.now(),
+                tags: ["uploaded"],
+              };
+              addMediaItem(mediaItem);
+            };
+            video.src = serverUrl;
+          } else {
+            // For non-video files, add immediately
+            const mediaItem = {
+              id: fileId,
+              type: type,
+              source: serverUrl, // Use server URL instead of blob URL
+              name: file.name,
+              thumbnail: type === "image" ? serverUrl : undefined,
+              duration: undefined,
+              size: file.size,
+              createdAt: Date.now(),
+              tags: ["uploaded"],
+            };
+            addMediaItem(mediaItem);
+          }
+        } catch (error) {
+          console.error("Upload error:", error);
+          // Fallback to local blob URL if upload fails
+          const preview = URL.createObjectURL(file);
+
+          if (type === "video") {
+            const video = document.createElement("video");
+            video.preload = "metadata";
+            video.onloadedmetadata = () => {
+              const mediaItem = {
+                id: fileId,
+                type: type,
+                source: preview,
+                name: file.name,
+                thumbnail: undefined,
+                duration: video.duration,
+                size: file.size,
+                createdAt: Date.now(),
+                tags: ["uploaded"],
+              };
+              addMediaItem(mediaItem);
+            };
+            video.src = preview;
+          } else {
+            const mediaItem = {
+              id: fileId,
+              type: type,
+              source: preview,
+              name: file.name,
+              thumbnail: type === "image" ? preview : undefined,
+              duration: undefined,
+              size: file.size,
+              createdAt: Date.now(),
+              tags: ["uploaded"],
+            };
+            addMediaItem(mediaItem);
+          }
+        }
+      }
 
       setShowUploadArea(false);
     },
@@ -113,15 +187,16 @@ export function MediaArea() {
     type: "video" | "audio" | "image" | "text";
     source: string;
     name: string;
+    duration?: number;
   }) => {
     const clip = {
       id: `clip-${Date.now()}`,
       type: item.type,
       source: item.source,
       startTime: 0,
-      duration: item.type === "image" ? 3 : 5,
+      duration: item.duration || (item.type === "image" ? 3 : 5), // Use actual duration or default
       track: 0,
-      position: currentTime,
+      position: 0, // Let the store calculate the position
       volume: 1,
     };
 
@@ -162,14 +237,14 @@ export function MediaArea() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Video className="w-5 h-5 text-neon-cyan" />
-          <h2 className="text-neon-cyan text-lg font-bold">Media Library</h2>
+          <Video className="w-5 h-5 text-blue-400" />
+          <h2 className="text-blue-400 text-lg font-bold">Media Library</h2>
         </div>
 
         {/* Upload Button */}
         <button
           onClick={() => setShowUploadArea(!showUploadArea)}
-          className="cyberpunk-btn px-3 py-2 rounded-lg text-sm flex items-center gap-2"
+          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm flex items-center gap-2 transition-colors"
         >
           <Plus className="w-4 h-4" />
           Upload
@@ -184,24 +259,24 @@ export function MediaArea() {
             className={cn(
               "border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-200",
               isDragActive
-                ? "border-neon-cyan bg-neon-cyan/10"
-                : "border-border hover:border-neon-cyan/50 hover:bg-secondary/50"
+                ? "border-blue-400 bg-blue-400/10"
+                : "border-gray-600 hover:border-blue-400/50 hover:bg-gray-800/50"
             )}
           >
             <input {...getInputProps()} />
             <div className="flex flex-col items-center gap-2">
-              <Upload className="w-8 h-8 text-muted-foreground" />
+              <Upload className="w-8 h-8 text-gray-400" />
               <div className="text-sm">
                 {isDragActive ? (
-                  <span className="text-neon-cyan">Drop files here...</span>
+                  <span className="text-blue-400">Drop files here...</span>
                 ) : (
-                  <span className="text-muted-foreground">
+                  <span className="text-gray-400">
                     Drag & drop files here, or{" "}
-                    <span className="text-neon-cyan">tap to select</span>
+                    <span className="text-blue-400">tap to select</span>
                   </span>
                 )}
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs text-gray-500">
                 Supports: {SUPPORTED_VIDEO_FORMATS.join(", ")} |{" "}
                 {SUPPORTED_AUDIO_FORMATS.join(", ")} |{" "}
                 {SUPPORTED_IMAGE_FORMATS.join(", ")}
@@ -214,13 +289,13 @@ export function MediaArea() {
       {/* Search and Filters - Mobile optimized */}
       <div className="mb-4 space-y-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             placeholder="Search media..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-secondary border border-border rounded-lg text-foreground placeholder-muted-foreground focus:border-neon-cyan focus:outline-none text-sm"
+            className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-400 focus:border-blue-400 focus:outline-none text-sm"
           />
         </div>
 
@@ -232,7 +307,7 @@ export function MediaArea() {
                 e.target.value as "all" | "video" | "audio" | "image" | "text"
               )
             }
-            className="flex-1 p-3 bg-secondary border border-border rounded-lg text-foreground focus:border-neon-cyan focus:outline-none text-sm"
+            className="flex-1 p-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:border-blue-400 focus:outline-none text-sm"
           >
             <option value="all">All Types</option>
             <option value="video">Video</option>
@@ -243,7 +318,7 @@ export function MediaArea() {
 
           <button
             onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-            className="p-3 bg-secondary border border-border rounded-lg text-foreground hover:border-neon-cyan transition-colors"
+            className="p-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 hover:border-blue-400 transition-colors"
           >
             {viewMode === "grid" ? (
               <List className="w-4 h-4" />
@@ -258,11 +333,11 @@ export function MediaArea() {
       <div className="flex-1 overflow-y-auto min-h-0">
         {filteredMedia.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-4">
-            <Video className="w-16 h-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium text-muted-foreground mb-2">
+            <Video className="w-16 h-16 text-gray-500 mb-4" />
+            <h3 className="text-lg font-medium text-gray-400 mb-2">
               No media found
             </h3>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-gray-500">
               {searchQuery || filterType !== "all"
                 ? "Try adjusting your search or filters"
                 : "Upload media or generate content with AI to get started"}
@@ -279,10 +354,10 @@ export function MediaArea() {
               <div
                 key={item.id}
                 className={cn(
-                  "relative group cursor-pointer border border-border rounded-lg overflow-hidden transition-all",
+                  "relative group cursor-pointer border border-gray-700 rounded-lg overflow-hidden transition-all",
                   selectedMedia === item.id
-                    ? "border-neon-cyan bg-neon-cyan/10"
-                    : "hover:border-neon-cyan/50 hover:bg-secondary/50",
+                    ? "border-blue-400 bg-blue-400/10"
+                    : "hover:border-blue-400/50 hover:bg-gray-800/50",
                   viewMode === "grid" ? "aspect-video" : "h-20"
                 )}
                 draggable
@@ -302,23 +377,23 @@ export function MediaArea() {
                     />
                   )}
                   {item.type === "video" && (
-                    <div className="w-full h-full bg-gradient-to-br from-neon-cyan/20 to-neon-magenta/20 flex items-center justify-center">
-                      <Video className="w-8 h-8 text-neon-cyan" />
+                    <div className="w-full h-full bg-gradient-to-br from-blue-400/20 to-purple-400/20 flex items-center justify-center">
+                      <Video className="w-8 h-8 text-blue-400" />
                     </div>
                   )}
                   {item.type === "audio" && (
-                    <div className="w-full h-full bg-gradient-to-br from-neon-green/20 to-neon-cyan/20 flex items-center justify-center">
-                      <Music className="w-8 h-8 text-neon-green" />
+                    <div className="w-full h-full bg-gradient-to-br from-green-400/20 to-blue-400/20 flex items-center justify-center">
+                      <Music className="w-8 h-8 text-green-400" />
                     </div>
                   )}
                   {item.type === "text" && (
-                    <div className="w-full h-full bg-gradient-to-br from-neon-magenta/20 to-neon-yellow/20 flex items-center justify-center">
-                      <Type className="w-8 h-8 text-neon-magenta" />
+                    <div className="w-full h-full bg-gradient-to-br from-purple-400/20 to-yellow-400/20 flex items-center justify-center">
+                      <Type className="w-8 h-8 text-purple-400" />
                     </div>
                   )}
 
                   {/* Type Badge */}
-                  <div className="absolute top-2 left-2 bg-black/50 rounded px-2 py-1">
+                  <div className="absolute top-2 left-2 bg-black/60 rounded px-2 py-1">
                     <div className="flex items-center gap-1 text-white text-xs">
                       {getMediaIcon(item.type)}
                       <span className="capitalize">{item.type}</span>
@@ -327,7 +402,7 @@ export function MediaArea() {
 
                   {/* Duration Badge */}
                   {item.duration && (
-                    <div className="absolute bottom-2 right-2 bg-black/50 rounded px-2 py-1">
+                    <div className="absolute bottom-2 right-2 bg-black/60 rounded px-2 py-1">
                       <div className="text-white text-xs">
                         {formatDuration(item.duration)}
                       </div>
@@ -341,7 +416,7 @@ export function MediaArea() {
                         e.stopPropagation();
                         handleAddToTimeline(item);
                       }}
-                      className="p-1 bg-black/50 rounded text-white hover:bg-neon-cyan/50 transition-colors"
+                      className="p-1 bg-black/60 rounded text-white hover:bg-blue-400/50 transition-colors"
                       title="Add to timeline"
                     >
                       <Plus className="w-3 h-3" />
@@ -351,7 +426,7 @@ export function MediaArea() {
                         e.stopPropagation();
                         removeMediaItem(item.id);
                       }}
-                      className="p-1 bg-black/50 rounded text-white hover:bg-destructive/50 transition-colors"
+                      className="p-1 bg-black/60 rounded text-white hover:bg-red-400/50 transition-colors"
                       title="Delete"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -365,10 +440,10 @@ export function MediaArea() {
                     <div className="flex items-center gap-3">
                       {getMediaIcon(item.type)}
                       <div>
-                        <div className="text-sm font-medium text-foreground">
+                        <div className="text-sm font-medium text-gray-100">
                           {item.name}
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-gray-400">
                           {item.duration &&
                             `${formatDuration(item.duration)} • `}
                           {item.size && formatFileSize(item.size)}
@@ -385,8 +460,8 @@ export function MediaArea() {
 
       {/* Drag Instructions */}
       {draggedItem && (
-        <div className="mt-4 p-3 bg-neon-cyan/10 border border-neon-cyan rounded-lg">
-          <div className="text-sm text-neon-cyan">
+        <div className="mt-4 p-3 bg-blue-400/10 border border-blue-400 rounded-lg">
+          <div className="text-sm text-blue-400">
             Drag to timeline to add media
           </div>
         </div>

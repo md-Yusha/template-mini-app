@@ -308,11 +308,30 @@ export const useVibeForgeStore = create<VibeForgeState>()(
       addClip: (trackId, clip) =>
         set((state) => {
           if (!state.currentProject) return state;
+
+          const track = state.currentProject.tracks.find(
+            (t) => t.id === trackId
+          );
+          if (!track) return state;
+
+          // Calculate the end position of the last clip in this track
+          let newPosition = 0;
+          if (track.clips.length > 0) {
+            const lastClip = track.clips[track.clips.length - 1];
+            newPosition = lastClip.position + lastClip.duration;
+          }
+
+          // Create new clip with calculated position
+          const newClip = {
+            ...clip,
+            position: newPosition,
+          };
+
           return {
             currentProject: {
               ...state.currentProject,
               tracks: state.currentProject.tracks.map((t) =>
-                t.id === trackId ? { ...t, clips: [...t.clips, clip] } : t
+                t.id === trackId ? { ...t, clips: [...t.clips, newClip] } : t
               ),
               updatedAt: Date.now(),
             },

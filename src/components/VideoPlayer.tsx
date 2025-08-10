@@ -7,7 +7,6 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { motion } from "framer-motion";
 import {
   Play,
   Pause,
@@ -18,6 +17,7 @@ import {
   Image as ImageIcon,
   Type,
   Music,
+  Maximize2,
 } from "lucide-react";
 import { useVibeForgeStore } from "~/lib/store";
 
@@ -131,12 +131,12 @@ export function VideoPlayer() {
   const renderMediaContent = useMemo(() => {
     if (!currentMedia) {
       return (
-        <div className="flex flex-col items-center justify-center h-full text-center p-4">
-          <Film className="w-16 h-16 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium text-muted-foreground mb-2">
+        <div className="flex flex-col items-center justify-center h-full text-center p-4 bg-gray-900">
+          <Film className="w-16 h-16 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-300 mb-2">
             No video loaded
           </h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-gray-400">
             Upload media or generate content with AI to get started.
           </p>
         </div>
@@ -149,7 +149,7 @@ export function VideoPlayer() {
           <video
             ref={videoRef}
             src={currentMedia.source}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-contain bg-black"
             onTimeUpdate={handleTimeUpdate}
             onEnded={() => setIsPlaying(false)}
             muted={isMuted}
@@ -160,8 +160,8 @@ export function VideoPlayer() {
 
       case "image":
         return (
-          <div className="flex flex-col items-center justify-center h-full p-4">
-            <ImageIcon className="w-8 h-8 text-neon-cyan mb-2" />
+          <div className="flex flex-col items-center justify-center h-full bg-gray-900">
+            <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
             <img
               src={currentMedia.source}
               alt="Timeline image"
@@ -173,13 +173,13 @@ export function VideoPlayer() {
 
       case "text":
         return (
-          <div className="flex flex-col items-center justify-center h-full p-4">
-            <Type className="w-8 h-8 text-neon-cyan mb-2" />
+          <div className="flex flex-col items-center justify-center h-full bg-gray-900">
+            <Type className="w-8 h-8 text-gray-400 mb-2" />
             <div className="text-center">
-              <div className="text-2xl font-bold text-neon-cyan mb-2">
+              <div className="text-2xl font-bold text-gray-200 mb-2">
                 Text Overlay
               </div>
-              <div className="text-lg text-foreground">
+              <div className="text-lg text-gray-300">
                 {currentMedia.content || "No text content"}
               </div>
             </div>
@@ -188,13 +188,13 @@ export function VideoPlayer() {
 
       case "audio":
         return (
-          <div className="flex flex-col items-center justify-center h-full p-4">
-            <Music className="w-16 h-16 text-neon-cyan mb-4" />
+          <div className="flex flex-col items-center justify-center h-full bg-gray-900">
+            <Music className="w-16 h-16 text-gray-400 mb-4" />
             <div className="text-center">
-              <div className="text-lg font-medium text-foreground mb-2">
+              <div className="text-lg font-medium text-gray-300 mb-2">
                 Audio Track
               </div>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-gray-400">
                 {currentMedia.source ? "Audio playing..." : "No audio source"}
               </div>
             </div>
@@ -203,97 +203,101 @@ export function VideoPlayer() {
 
       default:
         return (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-muted-foreground">Unknown media type</div>
+          <div className="flex items-center justify-center h-full bg-gray-900">
+            <div className="text-gray-400">Unknown media type</div>
           </div>
         );
     }
   }, [currentMedia, handleTimeUpdate, isMuted, setIsPlaying]);
 
   return (
-    <div className="h-full flex flex-col bg-black rounded-lg overflow-hidden">
+    <div className="h-full flex flex-col bg-gray-900 rounded-lg overflow-hidden relative group">
       {/* Media Display */}
-      <div className="flex-1 relative group">
+      <div className="flex-1 relative">
         {renderMediaContent}
 
-        {/* Mobile-friendly overlay controls */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: showControls ? 1 : 0 }}
-          className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none"
-        />
-
-        {/* Top Controls - Simplified for mobile */}
-        <div className="absolute top-2 right-2 flex items-center gap-1">
-          <button
-            onClick={() => setShowControls(!showControls)}
-            className="p-2 bg-black/50 rounded-lg text-white hover:bg-black/70 transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Center Play Button - Larger for mobile */}
+        {/* Video Controls Overlay - Only show for video content */}
         {currentMedia?.type === "video" && (
-          <button
-            onClick={handlePlayPause}
-            className="absolute inset-0 flex items-center justify-center group-hover:opacity-100 opacity-0 transition-opacity"
-          >
-            <div className="p-6 bg-black/50 rounded-full">
-              {isPlaying ? (
-                <Pause className="w-12 h-12 text-white" />
-              ) : (
-                <Play className="w-12 h-12 text-white ml-1" />
-              )}
+          <>
+            {/* Top Controls */}
+            <div className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => setShowControls(!showControls)}
+                className="p-2 bg-black/60 rounded-lg text-white hover:bg-black/80 transition-colors backdrop-blur-sm"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+              <button className="p-2 bg-black/60 rounded-lg text-white hover:bg-black/80 transition-colors backdrop-blur-sm">
+                <Maximize2 className="w-4 h-4" />
+              </button>
             </div>
-          </button>
+
+            {/* Center Play Button */}
+            <button
+              onClick={handlePlayPause}
+              className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <div className="p-4 bg-black/60 rounded-full backdrop-blur-sm">
+                {isPlaying ? (
+                  <Pause className="w-8 h-8 text-white" />
+                ) : (
+                  <Play className="w-8 h-8 text-white ml-1" />
+                )}
+              </div>
+            </button>
+
+            {/* Bottom Controls */}
+            <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center justify-between bg-black/60 rounded-lg p-3 backdrop-blur-sm">
+                {/* Play/Pause */}
+                <button
+                  onClick={handlePlayPause}
+                  className="p-2 bg-white/20 rounded-lg text-white hover:bg-white/30 transition-colors"
+                >
+                  {isPlaying ? (
+                    <Pause className="w-4 h-4" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
+                </button>
+
+                {/* Volume */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleMuteToggle}
+                    className="p-2 bg-white/20 rounded-lg text-white hover:bg-white/30 transition-colors"
+                  >
+                    {isMuted ? (
+                      <VolumeX className="w-4 h-4" />
+                    ) : (
+                      <Volume2 className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Media Type Indicator */}
+                <div className="flex items-center gap-1 text-white text-xs">
+                  <Film className="w-3 h-3" />
+                  <span className="capitalize">Video</span>
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
-        {/* Bottom Controls - Simplified for mobile */}
-        <div className="absolute bottom-2 left-2 right-2">
-          <div className="flex items-center justify-between">
-            {/* Play/Pause for video */}
-            {currentMedia?.type === "video" && (
-              <button
-                onClick={handlePlayPause}
-                className="p-3 bg-black/50 rounded-lg text-white hover:bg-black/70 transition-colors"
-              >
-                {isPlaying ? (
-                  <Pause className="w-5 h-5" />
-                ) : (
-                  <Play className="w-5 h-5" />
-                )}
-              </button>
-            )}
-
-            {/* Volume - Simplified */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleMuteToggle}
-                className="p-3 bg-black/50 rounded-lg text-white hover:bg-black/70 transition-colors"
-              >
-                {isMuted ? (
-                  <VolumeX className="w-5 h-5" />
-                ) : (
-                  <Volume2 className="w-5 h-5" />
-                )}
-              </button>
+        {/* Non-video content controls */}
+        {currentMedia && currentMedia.type !== "video" && (
+          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 text-white text-xs bg-black/60 px-2 py-1 rounded backdrop-blur-sm">
+              {currentMedia.type === "image" && (
+                <ImageIcon className="w-3 h-3" />
+              )}
+              {currentMedia.type === "text" && <Type className="w-3 h-3" />}
+              {currentMedia.type === "audio" && <Music className="w-3 h-3" />}
+              <span className="capitalize">{currentMedia.type}</span>
             </div>
-
-            {/* Media Type Indicator */}
-            {currentMedia && (
-              <div className="flex items-center gap-1 text-white text-xs bg-black/50 px-2 py-1 rounded">
-                {currentMedia.type === "video" && <Film className="w-3 h-3" />}
-                {currentMedia.type === "image" && (
-                  <ImageIcon className="w-3 h-3" />
-                )}
-                {currentMedia.type === "text" && <Type className="w-3 h-3" />}
-                {currentMedia.type === "audio" && <Music className="w-3 h-3" />}
-                <span className="capitalize">{currentMedia.type}</span>
-              </div>
-            )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

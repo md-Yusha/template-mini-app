@@ -85,13 +85,13 @@ export function VibeForge() {
   };
 
   return (
-    <div className="h-screen bg-background text-foreground flex flex-col">
+    <div className="h-screen bg-gray-950 text-gray-100 flex flex-col">
       {/* Mobile Header */}
-      <header className="bg-card border-b border-border p-3">
+      <header className="bg-gray-900 border-b border-gray-800 p-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-neon-cyan">VibeForge</h1>
-            <span className="text-xs text-muted-foreground hidden sm:inline">
+            <h1 className="text-lg font-bold text-blue-400">VibeForge</h1>
+            <span className="text-xs text-gray-400 hidden sm:inline">
               AI video editor
             </span>
           </div>
@@ -100,48 +100,48 @@ export function VibeForge() {
           <div className="flex items-center gap-1">
             <button
               onClick={handlePlayPause}
-              className="cyberpunk-btn p-2 rounded-lg"
+              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
             >
               {isPlaying ? (
-                <Pause className="w-4 h-4" />
+                <Pause className="w-4 h-4 text-gray-300" />
               ) : (
-                <Play className="w-4 h-4" />
+                <Play className="w-4 h-4 text-gray-300" />
               )}
             </button>
 
             <button
               onClick={handleSkipBack}
-              className="cyberpunk-btn p-2 rounded-lg"
+              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
             >
-              <SkipBack className="w-4 h-4" />
+              <SkipBack className="w-4 h-4 text-gray-300" />
             </button>
 
             <button
               onClick={handleSkipForward}
-              className="cyberpunk-btn p-2 rounded-lg"
+              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
             >
-              <SkipForward className="w-4 h-4" />
+              <SkipForward className="w-4 h-4 text-gray-300" />
             </button>
           </div>
         </div>
 
         {/* Time Display */}
         <div className="flex items-center justify-between mt-2">
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-gray-400">
             {formatTime(currentTime)} /{" "}
             {formatTime(currentProject?.duration || 60)}
           </div>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-xs text-gray-400">
             {currentProject?.tracks.length || 0} tracks
           </div>
         </div>
       </header>
 
       {/* Pinned Video Preview */}
-      <div className="h-48 bg-card border-b border-border p-3">
+      <div className="h-48 bg-gray-900 border-b border-gray-800 p-3">
         <div className="flex items-center gap-2 mb-2">
-          <Video className="w-4 h-4 text-neon-cyan" />
-          <h2 className="text-neon-cyan text-sm font-bold">Preview</h2>
+          <Video className="w-4 h-4 text-blue-400" />
+          <h2 className="text-blue-400 text-sm font-bold">Preview</h2>
         </div>
         <div className="h-full">
           <VideoPlayer />
@@ -149,10 +149,12 @@ export function VibeForge() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-hidden">{renderTabContent()}</div>
+      <div className="flex-1 overflow-hidden bg-gray-950">
+        {renderTabContent()}
+      </div>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="bg-card border-t border-border p-2">
+      <nav className="bg-gray-900 border-t border-gray-800 p-2">
         <div className="flex items-center justify-around">
           {tabs.map((tab) => (
             <button
@@ -161,8 +163,8 @@ export function VibeForge() {
               className={cn(
                 "flex flex-col items-center gap-1 p-2 rounded-lg transition-colors min-w-0 flex-1",
                 activeTab === tab.id
-                  ? "bg-neon-cyan text-background"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-blue-600 text-white"
+                  : "text-gray-400 hover:text-gray-300 hover:bg-gray-800"
               )}
             >
               <tab.icon className="w-5 h-5" />

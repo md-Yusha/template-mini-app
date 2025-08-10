@@ -22,7 +22,7 @@ import {
 import { cn } from "~/lib/utils";
 
 export function FileUpload() {
-  const { addClip, addMediaItem, currentTime } = useVibeForgeStore();
+  const { addClip, addMediaItem } = useVibeForgeStore();
   const [uploadedFiles, setUploadedFiles] = useState<
     Array<{
       id: string;
@@ -87,41 +87,173 @@ export function FileUpload() {
     });
   };
 
-  const handleAddToMediaLibrary = (fileData: (typeof uploadedFiles)[0]) => {
-    const mediaItem = {
-      id: `media-${Date.now()}`,
-      type: fileData.type,
-      source: fileData.preview || URL.createObjectURL(fileData.file),
-      name: fileData.file.name,
-      thumbnail: fileData.type === "image" ? fileData.preview : undefined,
-      duration: fileData.type === "video" ? 10 : undefined, // Default duration
-      size: fileData.file.size,
-      createdAt: Date.now(),
-      tags: ["uploaded"],
-    };
+  const handleAddToMediaLibrary = async (
+    fileData: (typeof uploadedFiles)[0]
+  ) => {
+    try {
+      // Upload file to server
+      const formData = new FormData();
+      formData.append("file", fileData.file);
 
-    addMediaItem(mediaItem);
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-    // Mark as added to media library
-    setUploadedFiles((prev) =>
-      prev.map((f) => (f.id === fileData.id ? { ...f, addedToMedia: true } : f))
-    );
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const result = await response.json();
+      const serverUrl = result.url;
+
+      // For video files, we need to get the actual duration
+      if (fileData.type === "video") {
+        const video = document.createElement("video");
+        video.preload = "metadata";
+        video.onloadedmetadata = () => {
+          const mediaItem = {
+            id: `media-${Date.now()}`,
+            type: fileData.type,
+            source: serverUrl,
+            name: fileData.file.name,
+            thumbnail: fileData.type === "image" ? serverUrl : undefined,
+            duration: video.duration, // Use actual video duration
+            size: fileData.file.size,
+            createdAt: Date.now(),
+            tags: ["uploaded"],
+          };
+
+          addMediaItem(mediaItem);
+
+          // Mark as added to media library
+          setUploadedFiles((prev) =>
+            prev.map((f) =>
+              f.id === fileData.id ? { ...f, addedToMedia: true } : f
+            )
+          );
+        };
+        video.src = serverUrl;
+      } else {
+        // For non-video files, add immediately
+        const mediaItem = {
+          id: `media-${Date.now()}`,
+          type: fileData.type,
+          source: serverUrl,
+          name: fileData.file.name,
+          thumbnail: fileData.type === "image" ? serverUrl : undefined,
+          duration: undefined,
+          size: fileData.file.size,
+          createdAt: Date.now(),
+          tags: ["uploaded"],
+        };
+
+        addMediaItem(mediaItem);
+
+        // Mark as added to media library
+        setUploadedFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileData.id ? { ...f, addedToMedia: true } : f
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      // Fallback to local blob URL if upload fails
+      const mediaItem = {
+        id: `media-${Date.now()}`,
+        type: fileData.type,
+        source: fileData.preview || URL.createObjectURL(fileData.file),
+        name: fileData.file.name,
+        thumbnail: fileData.type === "image" ? fileData.preview : undefined,
+        duration: fileData.type === "video" ? 10 : undefined,
+        size: fileData.file.size,
+        createdAt: Date.now(),
+        tags: ["uploaded"],
+      };
+
+      addMediaItem(mediaItem);
+
+      // Mark as added to media library
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileData.id ? { ...f, addedToMedia: true } : f
+        )
+      );
+    }
   };
 
-  const handleAddToTimeline = (fileData: (typeof uploadedFiles)[0]) => {
-    const clip = {
-      id: `clip-${Date.now()}`,
-      type: fileData.type,
-      source: fileData.preview || URL.createObjectURL(fileData.file),
-      startTime: 0,
-      duration: fileData.type === "image" ? 3 : 5, // Default duration
-      track: 0,
-      position: currentTime,
-      volume: 1,
-    };
+  const handleAddToTimeline = async (fileData: (typeof uploadedFiles)[0]) => {
+    try {
+      // Upload file to server
+      const formData = new FormData();
+      formData.append("file", fileData.file);
 
-    // Add to the first available track of the appropriate type
-    addClip("video-track-1", clip);
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const result = await response.json();
+      const serverUrl = result.url;
+
+      // For video files, we need to get the actual duration
+      if (fileData.type === "video") {
+        const video = document.createElement("video");
+        video.preload = "metadata";
+        video.onloadedmetadata = () => {
+          const clip = {
+            id: `clip-${Date.now()}`,
+            type: fileData.type,
+            source: serverUrl,
+            startTime: 0,
+            duration: video.duration, // Use actual video duration
+            track: 0,
+            position: 0, // Changed from currentTime to 0
+            volume: 1,
+          };
+
+          // Add to the first available track of the appropriate type
+          addClip("video-track-1", clip);
+        };
+        video.src = serverUrl;
+      } else {
+        // For non-video files, use default duration
+        const clip = {
+          id: `clip-${Date.now()}`,
+          type: fileData.type,
+          source: serverUrl,
+          startTime: 0,
+          duration: fileData.type === "image" ? 3 : 5, // Default duration for non-video
+          track: 0,
+          position: 0, // Changed from currentTime to 0
+          volume: 1,
+        };
+
+        // Add to the first available track of the appropriate type
+        addClip("video-track-1", clip);
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      // Fallback to local blob URL if upload fails
+      const clip = {
+        id: `clip-${Date.now()}`,
+        type: fileData.type,
+        source: fileData.preview || URL.createObjectURL(fileData.file),
+        startTime: 0,
+        duration: fileData.type === "image" ? 3 : 5,
+        track: 0,
+        position: 0, // Changed from currentTime to 0
+        volume: 1,
+      };
+
+      // Add to the first available track of the appropriate type
+      addClip("video-track-1", clip);
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
