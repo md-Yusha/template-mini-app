@@ -1,0 +1,21 @@
+{
+  "accountAssociation": {
+    "header": "Farcaster-Account-Association",
+    "payload": "eyJmcmFtZSI6InZpYmVmb3JnZSIsImFjdGlvbiI6InNpZ24iLCJ0aW1lc3RhbXAiOjE3MzQ1Njc4OTB9",
+    "signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b"
+  },
+  "frame": {
+    "version": "1",
+    "name": "VibeForge",
+    "iconUrl": "https://vibeforge.vercel.app/icon.png",
+    "homeUrl": "https://vibeforge.vercel.app",
+    "imageUrl": "https://vibeforge.vercel.app/api/opengraph-image",
+    "buttonTitle": "Launch VibeForge",
+    "splashImageUrl": "https://vibeforge.vercel.app/splash.png",
+    "splashBackgroundColor": "#0b0f14",
+    "webhookUrl": "https://vibeforge.vercel.app/api/webhook",
+    "description": "AI-powered onchain video editor for Farcaster",
+    "primaryCategory": "Video Editor",
+    "tags": ["video", "ai", "editing", "nft", "farcaster"]
+  }
+}
